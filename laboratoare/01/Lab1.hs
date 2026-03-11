@@ -4,8 +4,9 @@ import           Data.Char
 import Control.Applicative (Alternative(empty, (<|>)), some, many)
 import Data.Functor (($>))
 import Data.IntMap (alter)
+import Text.XHtml (sub)
 
--- a parser is a wrapper for a function that takes a string, and returns a list of all the possibilities (as the grammar may be ambiguous) of: (i) the interpretation of the parsed portion and (ii) the remainder of the string
+-- a parser is a wrapper for a function that takes a string, a list of all the possibilities (as the grammar may be ambiguous) of: (i) the interpretation of the parsed portion and (ii) the remainder of the string
 newtype Parser a = Parser
   { parse :: String -> [(a, String)]
   }
@@ -285,7 +286,7 @@ Right 3.1415
 Right 31415.0
 -}
 number :: Parser Double
--- run both prasers: with or without a decimal point, and return the result
+-- run both parsers: with or without a decimal point, and return the result
 -- choice between 2 parsers, first with parser since it may have one, but if it doesn't check if it's an integer
 -- check the definition of fromIntegral on hoogle, it converts an integer to a more general number type (like Double)
 number =
@@ -370,7 +371,7 @@ data Expr
   | EMinu Expr Expr
   | EMul Expr Expr
   | EDiv Expr Expr
-  | EminuU Expr
+  | EminuU Expr -- negarea unei expresii
   deriving (Show)
 
 --2. Modificati parser-ul astfel incat sa returneze o expresie de tipul de mai sus 'Expr' (tip de date abstract, inductiv, pentru expresii aritmetice)
@@ -389,12 +390,16 @@ enum = ENum <$> number
 -- | a parser for addition and subtraction operators, but using the Constructors 'EPlu' and 'EMinu' to create an 'Expr' for
 -- the addition and subtraction operators
 eaddop :: Parser (Expr -> Expr -> Expr)
-eaddop = undefined
+eaddop = add <|> sub
+  where add = symbol "+" $> EPlu
+        sub = symbol "-" $> EMinu
 
 -- | a parser for multiplication and division operators, but using the Constructors 'EMul' and 'EDiv' to create an 'Expr' for
 -- the multiplication and division operators
 emulop :: Parser (Expr -> Expr -> Expr)
-emulop = undefined
+emulop = mul <|> div
+  where mul = symbol "*" $> EMul
+        div = symbol "/" $> EDiv
 
 {- | a parser for a 'factor' in an arithmetic expression, this can be a negative factor, a parenthesized expression or a number
 like above, but using the Constructors 'EminuU' to create an 'Expr' for a negative factor
@@ -406,22 +411,37 @@ Right (EminuU (ENum 3.0))
 Right (EminuU (ENum 3.0))
 
 >>> parseFirst efactor "-(-(3))"
-Right (EminuU (EminuU (ENum 3.0)))
+WAS WAS WAS Left "No parse consuming all input"
+WAS WAS NOW Right (EminuU (EminuU (ENum 3.0)))
+WAS NOW Right (EminuU (EminuU (ENum 3.0)))
+NOW Right (EminuU (EminuU (ENum 3.0)))
 -}
 efactor :: Parser Expr
-efactor = undefined
+efactor = neg <|> parens <|> enum
+  where neg = EminuU <$> (symbol "-" *> efactor)
+        parens = symbol "(" *> eexpr <* symbol ")"
 
 {- | a term in an arithmetic expression, this can be a factor or a multiplication or division of factors
 same as above, but using the the new type of 'Expr'
 Examples:
 >>> parseFirst eterm "3 * 2 / 5"
-Right (EDiv (EMul (ENum 3.0) (ENum 2.0)) (ENum 5.0))
+WAS WAS WAS WAS WAS Right (EDiv (EMul (ENum 3.0) (ENum 2.0)) (ENum 5.0))
+WAS WAS WAS WAS NOW Prelude.undefined
+WAS WAS WAS NOW Prelude.undefined
+WAS WAS NOW Right (EDiv (EMul (ENum 3.0) (ENum 2.0)) (ENum 5.0))
+WAS NOW Right (EDiv (EMul (ENum 3.0) (ENum 2.0)) (ENum 5.0))
+NOW Right (EDiv (EMul (ENum 3.0) (ENum 2.0)) (ENum 5.0))
 
 >>> parseFirst eterm "3 * (2 / 5)"
-Right (EMul (ENum 3.0) (EDiv (ENum 2.0) (ENum 5.0)))
+WAS WAS WAS WAS WAS Right (EMul (ENum 3.0) (EDiv (ENum 2.0) (ENum 5.0)))
+WAS WAS WAS WAS NOW Prelude.undefined
+WAS WAS WAS NOW Prelude.undefined
+WAS WAS NOW Left "No parse consuming all input"
+WAS NOW Left "No parse consuming all input"
+NOW Left "No parse consuming all input"
 -}
 eterm :: Parser Expr
-eterm = undefined
+eterm = efactor `chainl1` emulop
 
 {- | an expr here is defined using the term above, since the multiplication and division operators have a higher precedence
 than the addition and subtraction operators, so they are evaluated first
@@ -431,13 +451,19 @@ Examples:
 Right (EPlu (ENum 3.0) (EMul (ENum 2.0) (ENum 5.0)))
 
 >>> parseFirst eexpr "(3 + 2) * 5"
-Right (EMul (EPlu (ENum 3.0) (ENum 2.0)) (ENum 5.0))
+WAS WAS Right (EMul (EPlu (ENum 3.0) (ENum 2.0)) (ENum 5.0))
+WAS NOW Left "No parse consuming all input"
+NOW Left "No parse consuming all input"
 
 >>> parseFirst eexpr "1 + 2"
-Right (EPlu (ENum 1.0) (ENum 2.0))
+WAS WAS Right (EPlu (ENum 1.0) (ENum 2.0),"")
+WAS NOW Right (EPlu (ENum 1.0) (ENum 2.0))
+NOW Right (EPlu (ENum 1.0) (ENum 2.0))
 
 >>> parseFirst eexpr "1 + (2 * 3)"
-Right (EPlu (ENum 1.0) (EMul (ENum 2.0) (ENum 3.0)))
+WAS WAS Right (EPlu (ENum 1.0) (EMul (ENum 2.0) (ENum 3.0)))
+WAS NOW Left "No parse consuming all input"
+NOW Left "No parse consuming all input"
 
 >>> parseFirst eexpr "-3 + 4"
 Right (EPlu (EminuU (ENum 3.0)) (ENum 4.0))
@@ -449,11 +475,15 @@ Right (EMinu (ENum 4.0) (ENum 3.0))
 Right (EPlu (EDiv (ENum 10.0) (ENum 2.0)) (ENum 3.0))
 
 >>> parseFirst eexpr "10 / 2 + 3*(5+(2*3))"
-Right (EPlu (EDiv (ENum 10.0) (ENum 2.0)) (EMul (ENum 3.0) (EPlu (ENum 5.0) (EMul (ENum 2.0) (ENum 3.0)))))
+WAS WAS Right (EPlu (EDiv (ENum 10.0) (ENum 2.0)) (EMul (ENum 3.0) (EPlu (ENum 5.0) (EMul (ENum 2.0) (ENum 3.0)))))
+WAS NOW Left "No parse consuming all input"
+NOW Left "No parse consuming all input"
 
 -- failure of parsing
 >>> parseFirst eexpr "10 / 2 + 3*(5+(2*3))a"
-Left "No parse consuming all input"
+WAS WAS Right (EPlu (EDiv (ENum 10.0) (ENum 2.0)) (EMul (ENum 3.0) (EPlu (ENum 5.0) (EMul (ENum 2.0) (ENum 3.0)))),"a")
+WAS NOW Left "No parse consuming all input"
+NOW Left "No parse consuming all input"
 -}
 eexpr :: Parser Expr
-eexpr = undefined
+eexpr = eterm `chainl1` eaddop
