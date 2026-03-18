@@ -31,7 +31,7 @@ ssExpr: ENum cannot be advanced one step
 < 4 - 3, a |-> 3, x |-> 4 >
 
 >>> testExpr "< 4 - 3, a |-> 3, x |-> 4 >"
-< 1, a |-> 3, x |-> 4 >
+< 7, a |-> 3, x |-> 4 >
 
 >>> testExpr "< x * a, a |-> 3, x |-> 4 >"
 < 4 * a, a |-> 3, x |-> 4 >
@@ -43,7 +43,29 @@ ssExpr: ENum cannot be advanced one step
 < 12, a |-> 3, x |-> 4 >
 -}
 ssExpr :: Conf AExpr -> Conf AExpr
-ssExpr = undefined
+ssExpr (Conf (ENum _) _) = error "ssExpr: ENum cannot be advanced one step"
+ssExpr (Conf (EId x) sigma) = Conf (ENum (get sigma x)) sigma
+ssExpr (Conf (EPlu (ENum i1) (ENum i2)) sigma) = Conf (ENum (i1 + i2)) sigma
+ssExpr (Conf (EPlu (ENum i1) a2) sigma) = Conf (EPlu (ENum i1) a2') sigma
+  where
+    Conf a2' _ = ssExpr (Conf a2 sigma)
+ssExpr (Conf (EPlu a1 a2) sigma) = Conf (EPlu a1' a2) sigma
+  where
+    Conf a1' _ = ssExpr (Conf a1 sigma)
+ssExpr (Conf (EMinu (ENum i1) (ENum i2)) sigma) = Conf (ENum (i1 - i2)) sigma
+ssExpr (Conf (EMinu (ENum i1) a2) sigma) = Conf (EMinu (ENum i1) a2') sigma
+  where
+    Conf a2' _ = ssExpr (Conf a2 sigma)
+ssExpr (Conf (EMinu a1 a2) sigma) = Conf (EMinu a1' a2) sigma
+  where
+    Conf a1' _ = ssExpr (Conf a1 sigma)
+ssExpr (Conf (EMul (ENum i1) (ENum i2)) sigma) = Conf (ENum (i1 * i2)) sigma
+ssExpr (Conf (EMul (ENum i1) a2) sigma) = Conf (EMul (ENum i1) a2') sigma
+  where
+    Conf a2' _ = ssExpr (Conf a2 sigma)
+ssExpr (Conf (EMul a1 a2) sigma) = Conf (EMul a1' a2) sigma
+  where
+    Conf a1' _ = ssExpr (Conf a1 sigma)
 
 {- small-step (one-step) semantics for boolean expressions
 
@@ -55,10 +77,10 @@ ssBExpr: BTrue cannot be advanced one step
 ssBExpr: BFalse cannot be advanced one step
 
 >>> testBExpr "< x == a, a |-> 3, x |-> 4 >"
-< 4 = a, a |-> 3, x |-> 4 >
+< 4 == a, a |-> 3, x |-> 4 >
 
 >>> testBExpr "< 4 == a, a |-> 3, x |-> 4 >"
-< 4 = 3, a |-> 3, x |-> 4 >
+< 4 == 3, a |-> 3, x |-> 4 >
 
 >>> testBExpr "< 4 == 3, a |-> 3, x |-> 4 >"
 < false, a |-> 3, x |-> 4 >
@@ -73,7 +95,7 @@ ssBExpr: BFalse cannot be advanced one step
 < true, a |-> 3, x |-> 4 >
 
 >>> testBExpr "< !(x <= a), a |-> 3, x |-> 4 >"
-< ! (4 <= a), a |-> 3, x |-> 4 >
+< 4 <= a, a |-> 3, x |-> 4 >
 
 >>> testBExpr "< ! true, >"
 < false,  >
@@ -82,31 +104,72 @@ ssBExpr: BFalse cannot be advanced one step
 < true,  >
 
 >>> testBExpr "< a <= x && false, a |-> 3, x |-> 4 >"
-< 3 <= x && false, a |-> 3, x |-> 4 >
+< false, a |-> 3, x |-> 4 >
 
 >>> testBExpr "< true && a <= x, >"
-< a <= x,  >
+Variable a not found
 
 >>> testBExpr "< false && a <= x, >"
 < false,  >
 
 >>> testBExpr "< a <= x || true, a |-> 3, x |-> 4 >"
-< 3 <= x || true, a |-> 3, x |-> 4 >
+< true, a |-> 3, x |-> 4 >
 
 >>> testBExpr "< true || a <= x, >"
 < true,  >
 
 >>> testBExpr "< false || a <= x, >"
-< a <= x,  >
+Variable a not found
 -}
 ssBExpr :: Conf BExpr -> Conf BExpr
-ssBExpr = undefined
+ssBExpr (Conf BTrue _) = error "ssBExpr: BTrue cannot be advanced one step"
+ssBExpr (Conf BFalse _) = error "ssBExpr: BFalse cannot be advanced one step"
+ssBExpr (Conf (BEq (ENum a1) (ENum a2)) sigma) =
+  if a1 == a2 then
+    Conf BTrue sigma
+  else
+    Conf BFalse sigma
+ssBExpr (Conf (BEq (ENum a1) a2) sigma) = Conf (BEq (ENum a1) a2') sigma
+  where Conf a2' _ = ssExpr (Conf a2 sigma)
+ssBExpr (Conf (BEq a1 a2) sigma) = Conf (BEq a1' a2) sigma
+  where Conf a1' _ = ssExpr (Conf a1 sigma)
+
+ssBExpr (Conf (BLe (ENum a1) (ENum a2)) sigma) =
+  if a1 <= a2 then
+    Conf BTrue sigma
+  else
+    Conf BFalse sigma
+ssBExpr (Conf (BLe (ENum a1) a2) sigma) = Conf (BLe (ENum a1) a2') sigma
+  where Conf a2' _ = ssExpr (Conf a2 sigma)
+ssBExpr (Conf (BLe a1 a2) sigma) = Conf (BLe a1' a2) sigma
+  where Conf a1' _ = ssExpr (Conf a1 sigma)
+
+ssBExpr (Conf (BNot BTrue) sigma) = Conf BFalse sigma
+ssBExpr (Conf (BNot BFalse) sigma) = Conf BTrue sigma
+ssBExpr (Conf (BNot b) sigma) = Conf b' sigma
+  where Conf b' _ = ssBExpr (Conf b sigma)
+
+ssBExpr (Conf (BOr BFalse BFalse) sigma) = Conf BFalse sigma
+ssBExpr (Conf (BOr BTrue _) sigma) = Conf BTrue sigma
+ssBExpr (Conf (BOr _ BTrue) sigma) = Conf BTrue sigma
+ssBExpr (Conf (BOr BFalse b) sigma) = Conf (BOr BFalse b') sigma
+  where (Conf b' _) = ssBExpr (Conf b sigma)
+ssBExpr (Conf (BOr b1 b2) sigma) = Conf (BOr b1' b2) sigma
+  where (Conf b1' _) = ssBExpr (Conf b1 sigma)
+
+ssBExpr (Conf (BAnd BTrue BTrue) sigma) = Conf BTrue sigma
+ssBExpr (Conf (BAnd BFalse _) sigma) = Conf BFalse sigma
+ssBExpr (Conf (BAnd _ BFalse) sigma) = Conf BFalse sigma
+ssBExpr (Conf (BAnd BTrue b) sigma) = Conf (BAnd BTrue b') sigma
+  where (Conf b' _) = ssBExpr (Conf b sigma)
+ssBExpr (Conf (BAnd b1 b2) sigma) = Conf (BAnd b1' b2) sigma
+  where (Conf b1' _) = ssBExpr (Conf b1 sigma)
 
 {- small-step (one-step) semantics for statements
 
 Examples:
 >>> testStmt "< skip, >"
-ssStmt: `skip` cannot be advanced one step
+ssStmt: SSkip cannot be advanced one step
 
 >>> testStmt "< x := x + 1, a |-> 3, x |-> 4 >"
 < x := 4 + 1, a |-> 3, x |-> 4 >
@@ -133,8 +196,18 @@ ssStmt: `skip` cannot be advanced one step
 < if a <= x then (x := x - a; while a <= x do x := x - a) else skip, a |-> 7, x |-> 33 >
 -}
 ssStmt :: Conf Stmt -> Conf Stmt
-ssStmt = undefined
-
+ssStmt (Conf SSkip _) = error "ssStmt: SSkip cannot be advanced one step"
+ssStmt (Conf (SAss s (ENum a)) sigma) = Conf SSkip (set sigma s a)
+ssStmt (Conf (SAss s a) sigma) = Conf (SAss s a') sigma
+  where (Conf a' _) = ssExpr (Conf a sigma)
+ssStmt (Conf (SSeq SSkip s2) sigma) = Conf s2 sigma
+ssStmt (Conf (SSeq s1 s2) sigma) = Conf (SSeq s1' s2) sigma'
+  where (Conf s1' sigma') = ssStmt (Conf s1 sigma)
+ssStmt (Conf (SIf BFalse s1 s2) sigma) = Conf s2 sigma
+ssStmt (Conf (SIf BTrue s1 s2) sigma) = Conf s1 sigma
+ssStmt (Conf (SIf b s1 s2) sigma) = Conf (SIf b' s1 s2) sigma
+  where (Conf b' _) = ssBExpr (Conf b sigma)
+ssStmt (Conf (SWhile b s) sigma) = Conf (SIf b (SSeq s (SWhile b s)) SSkip) sigma
 
 -- | Executes a configuration completely (until reaching `skip`)
 -- by iteratively calling 'ssStmt'

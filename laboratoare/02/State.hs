@@ -18,3 +18,6 @@ get (State s) x =
 
 set :: State -> String -> Integer -> State
 set (State s) x v = State ((x, v) : filter (\p -> fst p /= x) s)
+
+test :: Int -> Bool
+test = undefined
