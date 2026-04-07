@@ -144,6 +144,12 @@ If failing it returns an appropriate error message.
 
 Examples:
 
+>>> testUnifyStep "h(Y) = b, g(Y) = X, X = g(Z), Y = Z" ""
+Left "Conflict between h/1 and b/0"
+
+>>> testUnifyStep "g(Y) = Y, h(Y) = W, Y = Z" "X |-> Y"
+Left "Cycle on Y"
+
 >>> testUnifyStep "g(Y) = X, f(X,h(X),Y) = f(g(Z),W,Z)" ""
 Right < [f(g(Y), h(g(Y)), Y) = f(g(Z), W, Z)], X |-> g(Y) >
 
@@ -161,34 +167,20 @@ Right < [Z = Z], W |-> h(g(Z)), Y |-> Z, X |-> g(Z) >
 
 >>> testUnifyStep "Z = Z" "Y |-> Z, X |-> g(Z)"
 Right < [], Y |-> Z, X |-> g(Z) >
-
-
 -}
 unifyStep :: SubstitutionLike s => Config s -> Either String (Config s)
-unifyStep (Config (Var x :=: Var y : eqs) s)
-  | x == y
-  = Right (Config eqs s)
-unifyStep (Config (Var x :=: t : eqs) s)
-  | x `elem` vars t
-  = Left $ "Cycle on " ++ x
-  | otherwise
-  = Right (Config (eapply (singletonSubst x t :: SubstitutionGraph) <$> eqs) (extend s x t))
-unifyStep (Config (t :=: Var x : eqs) s)
-  | x `elem` vars t
-  = Left $ "Cycle on " ++ x
-  | otherwise
-  = Right (Config (eapply sxt <$> eqs) (s >>> sxt))
-  where
-    sxt = singletonSubst x t
-unifyStep (Config (App f es :=: App g es' : eqs) s)
-  | f /= g || length es /= length es'
-  = Left $ "Conflict between " ++ f ++ "/" ++ show (length es) ++ " and " ++ g ++ "/" ++ show (length es')
-  | otherwise
-  = Right (Config (zipWith (:=:) es es' ++ eqs) s)
+unifyStep (Config _eqs _subst) = undefined
 
+{-| A class for things which can be unified
+-}
 class HasUnify eqs where
-  unify :: eqs -> Either String Substitution
+  -- | unifies the arguments producing either a 'Substitution' or an appropriate error 
+  -- Default implementation uses 'unifyAsList' then converts the SubstitutionGraph
+  unify :: HasVars eqs => eqs -> Either String Substitution
+  unify eqs = asSubstitution <$> unifyAsList eqs
 
+  -- | unifies the arguments producing either a 'SubstitutionGraph' or an appropriate error 
+  -- Default implementation uses 'unify' and 'makGraph' to obtain a SubstitutionGraph
   unifyAsList :: HasVars eqs => eqs -> Either String SubstitutionGraph
   unifyAsList eqs = makeGraph (vars eqs) <$> unify eqs
 
