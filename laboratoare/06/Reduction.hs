@@ -40,7 +40,17 @@ Right (Just ((\ y -> y) (\ z -> z)))
 Right (Just (\ z -> z))
 -}
 betaRed :: Expr -> Maybe Expr
-betaRed = undefined
+betaRed (Var x) = Nothing
+betaRed (App (Lambda x e) e') = Just (substitute x e' e)
+betaRed (App e e') = case betaRed e of
+                        Just eRed -> Just (App eRed e')
+                        Nothing -> do
+                                    ePrimRed <- betaRed e'
+                                    Just (App e ePrimRed)
+betaRed t@(Lambda x e) = case betaRed e of
+                            Just eRed -> Just (Lambda x eRed)
+                            Nothing -> Nothing
+
 
 {-| Repeats applying 'betaRed' until reaching a normal form
 

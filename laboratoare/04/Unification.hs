@@ -73,7 +73,7 @@ class SubstitutionLike s where
 
 {-| A 'SubstitutionLike' instance for 'SubstitutionGraph'
 
-Examples: 
+Examples:
 
 >>> idSubst :: SubstitutionGraph
 
@@ -169,17 +169,39 @@ Right < [Z = Z], W |-> h(g(Z)), Y |-> Z, X |-> g(Z) >
 Right < [], Y |-> Z, X |-> g(Z) >
 -}
 unifyStep :: SubstitutionLike s => Config s -> Either String (Config s)
-unifyStep (Config _eqs _subst) = undefined
+-- unifyStep (Config _eqs _subst) = undefined
+unifyStep (Config [] _subst) = Right (Config [] _subst) -- nimic de rezolvat, nu modificam nimic
+-- Milestone 1 : regula scoate pentru variabile egale: x=x
+unifyStep (Config (((Var s1) :=: (Var s2)) : eqs) _subst)
+  | s1 == s2 = Right (Config eqs _subst)
+-- Milestone 2: Regula rezolva
+-- 2.1. Extindem _subst_ cu x |-> t
+-- 2.2. in toti termenii din _subst, x e inlocuit cu t
+-- 2.3. in toti termenii din eqs, x e inlocuit cu t
+unifyStep (Config ((Var x :=: t) : eqs) _subst)
+  | x `elem` vars t = Left ("Cycle on " ++ show x)
+  | otherwise = Right (Config r s) where
+                  r = map (eapply s) eqs
+                  s = extend _subst x t
+unifyStep (Config ((t :=: Var x) : eqs) _subst) = unifyStep (Config ((Var x :=: t) : eqs) _subst)
+-- Milestone 3: regula descompunere
+unifyStep (Config ((App f fargs :=: App g gargs) : eqs) _subst)
+  | f /= g || length fargs /= length gargs = Left ("Conflict between " ++ show f ++ "/" ++ show (length fargs) ++ " and " ++ show g ++ "/" ++ show (length gargs))
+  | otherwise = let
+                  zippedArgs = zip fargs gargs
+                  newEquations = map (\(x, y) -> (x :=: y)) zippedArgs ++ eqs
+                in
+                  Right (Config newEquations _subst)
 
 {-| A class for things which can be unified
 -}
 class HasUnify eqs where
-  -- | unifies the arguments producing either a 'Substitution' or an appropriate error 
+  -- | unifies the arguments producing either a 'Substitution' or an appropriate error
   -- Default implementation uses 'unifyAsList' then converts the SubstitutionGraph
   unify :: HasVars eqs => eqs -> Either String Substitution
   unify eqs = asSubstitution <$> unifyAsList eqs
 
-  -- | unifies the arguments producing either a 'SubstitutionGraph' or an appropriate error 
+  -- | unifies the arguments producing either a 'SubstitutionGraph' or an appropriate error
   -- Default implementation uses 'unify' and 'makGraph' to obtain a SubstitutionGraph
   unifyAsList :: HasVars eqs => eqs -> Either String SubstitutionGraph
   unifyAsList eqs = makeGraph (vars eqs) <$> unify eqs
@@ -255,8 +277,8 @@ instance HasUnify [Expr] where
 -- Extra stuff for testing
 
 testUnify :: (HasUnify e, HasVars e, Show e) => Parser e -> String -> Either String SubstitutionGraph
-testUnify p s = parseFirst p s >>= unifyAsList 
-    
+testUnify p s = parseFirst p s >>= unifyAsList
+
 testUnifyEqs :: String -> Either String SubstitutionGraph
 testUnifyEqs = testUnify pequations
 
@@ -267,7 +289,7 @@ testUnifyEq :: String -> Either String SubstitutionGraph
 testUnifyEq = testUnify pequation
 
 testUnifyStep :: String -> String -> Either String (Config SubstitutionGraph)
-testUnifyStep eqss substs 
+testUnifyStep eqss substs
   = do
     eqs <- parseFirst pequations eqss
     subst <- parseFirst pSubstitutionGraph substs

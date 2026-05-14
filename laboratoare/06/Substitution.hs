@@ -4,6 +4,7 @@ import Data.List (intercalate, nub, sort)
 
 import Syntax ( Expr(..), Variable(..) )
 import Parser (parseFirst, pexpr, pvar, symbol)
+import GHC.ResponseFile (escapeArgs)
 
 {-| The free variables of an expression
 
@@ -17,7 +18,9 @@ Right [x,y]
 Right [y,z]
 -}
 freeVars :: Expr -> [Variable]
-freeVars = undefined
+freeVars (Var x) = [x]
+freeVars (App e1 e2) = nub (freeVars e1 ++ freeVars e2)
+freeVars (Lambda x e) = [v | v <- freeVars e, v /= x]
 
 {-| A fresh variable with the same name as the first argument and not ocurring in the second argument
 It chooses the least index possible with the property above.
@@ -58,7 +61,10 @@ Right (y y)
 Right (y (\ x -> x))
 
 >>> testSubstitute "(x (\\y -> x))[x := y]"
-Right (y (\ y_1 -> y))
+WAS WAS WAS Right (y (\ y_1 -> y))
+WAS WAS NOW Right (y (\ x_1 -> x_1))
+WAS NOW Right (y (\ x_1 -> y))
+NOW Right (y (\ y_1 -> y))
 
 >>> testSubstitute "\\y -> x (\\w -> v w x)[x := u v]"
 Right (\ y -> ((u v) (\ w -> ((v w) (u v)))))
@@ -67,13 +73,30 @@ Right (\ y -> ((u v) (\ w -> ((v w) (u v)))))
 Right (\ y -> ((\ y -> (x y)) (\ x -> x)))
 
 >>> testSubstitute "y (\\v -> x v)[x := \\y -> v y]"
-Right (y (\ v_1 -> ((\ y -> (v y)) v_1)))
+WAS WAS WAS Right (y (\ v_1 -> ((\ y -> (v y)) v_1)))
+WAS WAS NOW Right (y (\ x_1 -> ((\ y -> (x_1 y)) x_1)))
+WAS NOW Right (y (\ x_1 -> ((\ y -> (v y)) x_1)))
+NOW Right (y (\ v_1 -> ((\ y -> (v y)) v_1)))
 
 >>> testSubstitute "\\x -> z y[x := u v]"
 Right (\ x -> (z y))
 -}
 substitute :: Variable -> Expr -> Expr -> Expr
-substitute x e = undefined
+substitute x e (Var y) = if x == y then e else Var y
+substitute x e (App e1 e2) = App (substitute x e e1) (substitute x e e2)
+-- substitute x e (Lambda y e') = if y == x then Lambda y e' else
+--                                   if not (y `elem` freeVars e) then (Lambda y (substitute x e e'))
+--                                     else let reunion = nub (freeVars e ++ freeVars e')
+--                                              fresh = freshVar y reunion
+--                                              substitution1 = substitute y (Var fresh) e'
+--                                              substitution2 = substitute x e substitution1
+--                                           in Lambda fresh substitution2
+substitute x e t@(Lambda y e')
+  | x == y = t
+  | y `notElem` freeVars e =
+      Lambda y (substitute x e e')
+  | otherwise = substitute x e (Lambda z (substitute z (substitute y (Var z) e') e'))where
+      z = freshVar y (nub (freeVars e ++ freeVars e'))
 
 testFreeVars :: String -> Either String [Variable]
 testFreeVars s = freeVars <$> parseFirst pexpr s

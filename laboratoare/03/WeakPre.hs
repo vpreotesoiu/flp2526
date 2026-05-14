@@ -11,7 +11,16 @@ unit c = Condition c Nothing
 {- | The weakest precondition of a statement with respect to a postcondition. -}
 wlp :: Stmt -> Condition -> Condition
 wlp SSkip post = post
-wlp _ _ = error "not implemented"
+wlp (SAss x e) post = Condition (subst x e (condition post)) (goals post)
+wlp (SSeq c1 c2) post = wlp c1 (wlp c2 post)
+wlp (SIf b c1 c2) post = Condition conditiaIfului goaluriAcumulateIf where
+  conditiaLuiC1 = wlp c1 post
+  conditiaLuiC2 = wlp c2 post
+  conditiaIfului = (b `BAnd` condition conditiaLuiC1) `BOr` (BNot b `BAnd` condition conditiaLuiC2)
+  goaluriAcumulateIf = goals conditiaLuiC1 <> goals conditiaLuiC2
+wlp (SWhile b c inv) post = Condition inv newGoals where
+  conditiaLuiC = wlp c (Condition inv Nothing)
+  newGoals = goals post <> Just (inv `BAnd` BNot b `implies` condition post) <> Just ((inv `BAnd` b) `implies` condition conditiaLuiC) <> goals conditiaLuiC
 
 {- | The verification condition of a Hoare triple. -}
 verificationCondition :: HoareTriple -> BExpr
@@ -41,10 +50,10 @@ verificationCondition (HoareTriple pre stmt post) =
 ! (true) || x <= y && (y == x || y == y) && x <= y && y <= y || ! (x <= y) && (x == x || x == y) && x <= x && y <= x
 
 >>> testvc "{true} while true do skip invariant true {ultimateQuestionOfLife == 42}"
-(! (true) || true) && (! (true && true) || true) && (! (true && ! (true)) || ultimateQuestionOfLife == 42)
+(! (true) || true) && (! (true && ! (true)) || ultimateQuestionOfLife == 42) && (! (true && true) || true)
 
 >>> testvc "{true} s := 0;\ni := 0;\nwhile i <= n do (\n    s := s + i;\n    i := i + 1\n) invariant i <= n + 1 && 2 * s == i * (i - 1) {2 * s == n * (n + 1)}"
-(! (true) || 0 <= n + 1 && 2 * 0 == 0 * (0 - 1)) && (! (i <= n + 1 && 2 * s == i * (i - 1) && i <= n) || i + 1 <= n + 1 && 2 * (s + i) == (i + 1) * (i + 1 - 1)) && (! (i <= n + 1 && 2 * s == i * (i - 1) && ! (i <= n)) || 2 * s == n * (n + 1))
+(! (true) || 0 <= n + 1 && 2 * 0 == 0 * (0 - 1)) && (! (i <= n + 1 && 2 * s == i * (i - 1) && ! (i <= n)) || 2 * s == n * (n + 1)) && (! (i <= n + 1 && 2 * s == i * (i - 1) && i <= n) || i + 1 <= n + 1 && 2 * (s + i) == (i + 1) * (i + 1 - 1))
 
 -}
 

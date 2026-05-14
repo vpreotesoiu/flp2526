@@ -61,7 +61,13 @@ Right (Y |-> redstoneBlock,)
 resolutionStep
   :: SubstitutionLike s
   => Query -> Clause -> Either String (s, Query)
-resolutionStep = undefined
+resolutionStep (Query (sl : lits)) cl = do
+  theta <- unify [head, sl]
+  Right (theta, qapply theta $ Query (lits ++ body)) where
+    cl' :: Clause = refreshWrt cl (Query (sl:lits))
+    head :: Expr = clHead cl'
+    body :: [Expr] = clBody cl'
+
 
 {-| Given
 
@@ -94,7 +100,10 @@ Right (Y |-> redstoneBlock, X_1 |-> redstoneBlock, Y_2 |-> oakLog, Y_1 |-> redst
 refutationStep
   :: SubstitutionLike s
   => s -> Query -> Clause -> Either String (s, Query)
-refutationStep = undefined
+refutationStep theta q cl = do
+  (theta', q') <- resolutionStep q cl
+  let theta'' = theta >>> theta'
+  Right (theta'', q')
 
 {- | Computes all possible applications of a single resolution step to the first
 literal in the 'Query'.
@@ -130,7 +139,7 @@ testRefutationStep substStr queryStr clauseStr
     query <- parseFirst pquery queryStr
     clause <- parseFirst pclause clauseStr
     refutationStep subst query clause
-    
+
 
 testClauseRefresh :: String -> String -> Either String Clause
 testClauseRefresh queryStr clauseStr
