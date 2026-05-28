@@ -65,11 +65,11 @@ unifyStep (Config (t :=: TVar x : eqs) s)
   = Right (Config (eapply sxt <$> eqs) (s >>> sxt))
   where
     sxt = singletonSubst x t
-unifyStep (Config (TArr _ _ :=: Base f : eqs) s) 
+unifyStep (Config (TArr _ _ :=: Base f : eqs) s)
   = Left $ "Conflict between type arrow and the base type " ++ f
-unifyStep (Config (Base f :=:TArr _ _  : eqs) s) 
+unifyStep (Config (Base f :=:TArr _ _  : eqs) s)
   = Left $ "Conflict between type arrow and the base type " ++ f
-unifyStep (Config (Base f :=: Base f' : eqs) s) 
+unifyStep (Config (Base f :=: Base f' : eqs) s)
   | f /= f' = Left $ "Conflict between base types " ++ f ++ " and " ++ f'
   | otherwise = Right (Config eqs s)
 unifyStep (Config (TArr t1 t2 :=: TArr t1' t2' : eqs) s)
@@ -152,8 +152,8 @@ instance HasUnify [Type] where
 -- Extra stuff for testing
 
 testUnify :: (HasUnify e, HasVars e, Show e) => Parser e -> String -> Either String SubstitutionGraph
-testUnify p s = parseFirst p s >>= unifyAsList 
-    
+testUnify p s = parseFirst p s >>= unifyAsList
+
 testUnifyEqs :: String -> Either String SubstitutionGraph
 testUnifyEqs = testUnify pequations
 
@@ -161,7 +161,7 @@ testUnifyEq :: String -> Either String SubstitutionGraph
 testUnifyEq = testUnify pequation
 
 testUnifyStep :: String -> String -> Either String (Config SubstitutionGraph)
-testUnifyStep eqss substs 
+testUnifyStep eqss substs
   = do
     eqs <- parseFirst pequations eqss
     subst <- parseFirst pSubstitutionGraph substs

@@ -390,7 +390,7 @@ pvar :: Parser Variable
 pvar =
   indexedVar
   <|>
-  (`V` 0) <$> identifier 
+  (`V` 0) <$> identifier
 
 efactor :: Parser Expr
 efactor =  Var <$> pvar <|> (symbol "(" *> pexpr <* symbol ")")
@@ -438,10 +438,10 @@ pexpr :: Parser Expr
 pexpr = efactor <|> papp <|> pabs
 
 ptype :: Parser Type
-ptype = tfactor <|> TArr
+ptype = tfactor <|> tArr
 
-TArr :: Parser Type
-TArr = foldr1 TArr <$> sepByN 2 tfactor (symbol "->")
+tArr :: Parser Type
+tArr = foldr1 TArr <$> sepByN 2 tfactor (symbol "->")
 
 indexedTVar :: Parser Variable
 indexedTVar = V <$> variable <*> (char '_' *> integerToken)
@@ -450,7 +450,7 @@ tvar :: Parser Variable
 tvar =
   indexedTVar
   <|>
-  (`V` 0) <$> variable 
+  (`V` 0) <$> variable
 
 tfactor :: Parser Type
 tfactor =  Base <$> identifier <|> TVar <$> tvar <|> (symbol "(" *> ptype <* symbol ")")

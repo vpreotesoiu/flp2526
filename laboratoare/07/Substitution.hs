@@ -62,7 +62,7 @@ class SubstitutionLike s where
 
 {-| A 'SubstitutionLike' instance for 'SubstitutionGraph'
 
-Examples: 
+Examples:
 
 >>> idSubst :: SubstitutionGraph
 

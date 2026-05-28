@@ -44,7 +44,7 @@ freshVar (V x _) xs = V x n
       | otherwise = n
 
 
-{-| Gathers the constraints which must be satisfied so that the given expression has 
+{-| Gathers the constraints which must be satisfied so that the given expression has
     the given type under the given type assignment.
 
     Takes as an extra argument the list/set of variables already used to avoid using
@@ -52,7 +52,9 @@ freshVar (V x _) xs = V x n
 -}
 
 getConstraints :: Expr -> TypeAssignment -> Type -> [Variable] -> [Equation]
-getConstraints = undefined
+getConstraints (Var x) ta t vs = undefined
+getConstraints (App e1 e2) ta t vs = undefined
+getConstraints (Lambda x e) ta t vs = undefined
 
 {-| Type inferencer
 
@@ -77,7 +79,7 @@ typeInfer :: Expr -> Either String (TypeAssignment, Type)
 typeInfer e
   | exprNeedsRenaming e = Left "Expression uses the same variable name with differenr purposes"
   | otherwise
-    = do 
+    = do
       theta <- unify constraints
       Right (TypeAssignment [(x, apply theta t) | (x,t) <- gamma], vapply theta z)
     where

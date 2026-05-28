@@ -24,10 +24,33 @@ Right c
 Right c -> b
 
 >>> testTypeCheck "x :: a -> a" "x x"
-Left "x :: a -> a cannot be applied to x :: a -> a"
+WAS WAS WAS WAS Left "x :: a -> a cannot be applied to x :: a -> a"
+WAS WAS WAS NOW Left "i don't know 1"
+WAS WAS NOW Left "a -> a ... a -> a"
+WAS NOW Left "x :: a -> a cannot be applied to x :: a -> a"
+NOW Left "x :: a -> a cannot be applied to x :: a -> a"
 -}
 typeCheck :: TypeAssignment -> Expr -> Either String Type
-typeCheck = undefined
+typeCheck ta (Var x) =
+  do
+    t <- vlookup ta x
+    Right t
+typeCheck ta (App e1 e2) =
+  do
+    tf <- typeCheck ta e1
+    tx <- typeCheck ta e2
+    case tf of
+      TArr dom codom
+        | tx == dom -> Right codom
+      _ ->
+        Left (show e1 ++ " :: " ++ show tf ++ " cannot be applied to " ++ show e2 ++ " :: " ++ show tx)
+
+typeCheck ta (Lambda x e) =
+  do
+    te <- typeCheck ta e
+    tx <- vlookup ta x
+    Right (TArr tx te)
+
 
 {-| parser for  a singleton variable - type pair
 
